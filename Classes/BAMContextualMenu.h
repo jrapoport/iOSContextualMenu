@@ -34,6 +34,8 @@ typedef enum HMContextualMenuActivateOption : NSUInteger {
 
 @interface BAMContextualMenu : UIView
 
+@property (nonatomic, strong) UILongPressGestureRecognizer *longPressActivationGestureRecognizer;
+
 @property (nonatomic) BOOL menuIsShowing; //Flag to turn off the ability to activate the popup menu. Defaults to YES but will be NO if menuItems array is nil or empty.
 @property (nonatomic) BOOL shouldActivateMenu; //Flag to turn off the ability to activate the popup menu. Defaults to YES but will be NO if menuItems array is nil or empty.
 @property (nonatomic) BOOL shouldHighlightOutwards; //Defaults to YES. This flag determines whether or not the menu item will animate outwards on highlight. Or just stay in place.
@@ -41,6 +43,8 @@ typedef enum HMContextualMenuActivateOption : NSUInteger {
 @property (nonatomic) CGFloat menuItemDistancePadding; //Distance of each menuItem from the edge of the startingCircle (the thing that indicates your touch)
 
 @property (nonatomic) BAMContextualMenuActivateOption activateOption; //User can set this to switch between ways to activate the menu later on.
+
+- (id)initWithContainingView:(UIView *)containingView activateOption:(BAMContextualMenuActivateOption)startActivateOption delegate:(id <BAMContextualMenuDelegate>)contextualDelegate andDataSource:(id <BAMContextualMenuDataSource>)contextualDataSource;
 
 //This will tear down all subviews will calling all implemented data source and delegate methods.
 - (void)reloadDataAndRelayoutSubviews;
@@ -69,7 +73,7 @@ typedef enum HMContextualMenuActivateOption : NSUInteger {
 - (void)contextualMenuDismissed:(BAMContextualMenu *)contextualMenu;
 
 - (void)contextualMenu:(BAMContextualMenu *)contextualMenu didSelectItemAtIndex:(NSUInteger)index;
-- (void)contextualMenu:(BAMContextualMenu *)contextualMenu didHighlightItemAtIndex:(NSUInteger)index;
+- (void)contextualMenu:(BAMContextualMenu *)contextualMenu didHighlightItemAtIndex:(NSUInteger)index highlighted:(BOOL)highlighted;
 - (UIView *)contextualMenu:(BAMContextualMenu *)contextualMenu viewForHighlightedMenuItemAtIndex:(NSUInteger)index;
 - (NSString *)contextualMenu:(BAMContextualMenu *)contextualMenu titleForMenuItemAtIndex:(NSUInteger)index;
 - (UIFont *)contextualMenu:(BAMContextualMenu *)contextualMenu fontForMenuItemTitleViewAtIndex:(NSUInteger)index;

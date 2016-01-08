@@ -96,6 +96,8 @@
 
 @implementation BAMContextualMenu
 
+@synthesize longPressActivationGestureRecognizer = longPressActivationGestureRecognizer;
+
 #pragma mark Initialization Methods
 - (id)initWithContainingView:(UIView *)containingView activateOption:(BAMContextualMenuActivateOption)startActivateOption delegate:(id <BAMContextualMenuDelegate>)contextualDelegate andDataSource:(id <BAMContextualMenuDataSource>)contextualDataSource
 {
@@ -107,7 +109,7 @@
         
         _menuIsShowing = NO;
         
-        _menuItemDistancePadding = 30.0f;
+        _menuItemDistancePadding = 44.0f;
         
         shouldRelayoutSubviews = YES;
         menuItemIsAnimating = NO;
@@ -126,12 +128,14 @@
         shadowView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
         shadowView.alpha = 0.0f;
         
-        startCircleView = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, circleViewWidthHeight, circleViewWidthHeight)];
-        startCircleView.backgroundColor = [UIColor clearColor];
-        startCircleView.layer.cornerRadius = circleViewWidthHeight / 2.0;
-        startCircleView.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.75f].CGColor;
-        startCircleView.layer.borderWidth = startCircleStrokeWidth;
-        [shadowView addSubview:startCircleView];
+        /*
+         startCircleView = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, circleViewWidthHeight, circleViewWidthHeight)];
+         startCircleView.backgroundColor = [UIColor clearColor];
+         startCircleView.layer.cornerRadius = circleViewWidthHeight / 2.0;
+         startCircleView.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.75f].CGColor;
+         startCircleView.layer.borderWidth = startCircleStrokeWidth;
+         [shadowView addSubview:startCircleView];
+         */
         
         self.activateOption = startActivateOption;
     }
@@ -221,7 +225,7 @@
     CGPoint gestureLocationInRootView = [gestureRecognizer locationInView:rootView];
     
     if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
-        startingLocation = gestureLocationInRootView;
+        startingLocation = self.containerView.center;
         
         shadowView.frame = rootView.bounds;
         startCircleView.center = startingLocation;
@@ -557,8 +561,8 @@
     }
     menuItemIsAnimating = YES;
     
-    if (self.delegate && [self.delegate respondsToSelector:@selector(contextualMenu:didHighlightItemAtIndex:)]) {
-        [self.delegate contextualMenu:self didHighlightItemAtIndex:index];
+    if (self.delegate && [self.delegate respondsToSelector:@selector(contextualMenu:didHighlightItemAtIndex:highlighted:)]) {
+        [self.delegate contextualMenu:self didHighlightItemAtIndex:index highlighted: highlighted];
     }
     
     UIView *titleView = [contextualMenuTitleViews objectAtIndex:index];
@@ -577,6 +581,15 @@
             shouldUseDefaultSelectedBackgroundView = NO;
         }
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+    else if (menuItem && [menuItem respondsToSelector: @selector(setHighlighted:)]) {
+        
+        [menuItem setValue: @(highlighted) forKey: @"highlighted"];
+        
+        shouldUseDefaultSelectedBackgroundView = NO;
+    }
+#pragma clang diagnostic pop
     
     if (menuItem != highlightedMenuItem) {
         menuItem.hidden = highlighted;
@@ -589,8 +602,8 @@
     
     CGFloat titleLabelCenterMultiplier = (highlighted) ? -1.0 : 1.0;
     CGFloat alpha = (highlighted) ? 1.0 : 0.0;
-    CGFloat imageScaleGrow = 1.2;
-    CGFloat imageScaleShrink = 0.8;
+    //CGFloat imageScaleGrow = 1.2;
+    //CGFloat imageScaleShrink = 0.8;
     
     [UIView animateKeyframesWithDuration:0.2
                                    delay:0.0
@@ -614,25 +627,25 @@
                                                                 animations:^{
                                                                     titleView.center = CGPointMake(center.x, (((titleView.frame.size.height / 2.0) + titleLabelPadding) * titleLabelCenterMultiplier) + (center.y - (highlightedMenuItem.frame.size.height / 2.0)));
                                                                 }];
-                                  
-                                  //scale keyframes
-                                  if (highlighted) {
-                                      [UIView addKeyframeWithRelativeStartTime:0.0
-                                                              relativeDuration:0.1
-                                                                    animations:^{
-                                                                        highlightedMenuItem.transform = CGAffineTransformScale(CGAffineTransformIdentity, imageScaleGrow, imageScaleGrow);
-                                                                    }];
-                                      [UIView addKeyframeWithRelativeStartTime:0.1
-                                                              relativeDuration:0.5
-                                                                    animations:^{
-                                                                        highlightedMenuItem.transform = CGAffineTransformScale(CGAffineTransformIdentity, imageScaleShrink, imageScaleShrink);
-                                                                    }];
-                                      [UIView addKeyframeWithRelativeStartTime:0.6
-                                                              relativeDuration:0.4
-                                                                    animations:^{
-                                                                        highlightedMenuItem.transform = CGAffineTransformIdentity;
-                                                                    }];
-                                  }
+                                  /*
+                                   //scale keyframes
+                                   if (highlighted) {
+                                   [UIView addKeyframeWithRelativeStartTime:0.0
+                                   relativeDuration:0.1
+                                   animations:^{
+                                   highlightedMenuItem.transform = CGAffineTransformScale(CGAffineTransformIdentity, imageScaleGrow, imageScaleGrow);
+                                   }];
+                                   [UIView addKeyframeWithRelativeStartTime:0.1
+                                   relativeDuration:0.5
+                                   animations:^{
+                                   highlightedMenuItem.transform = CGAffineTransformScale(CGAffineTransformIdentity, imageScaleShrink, imageScaleShrink);
+                                   }];
+                                   [UIView addKeyframeWithRelativeStartTime:0.5
+                                   relativeDuration:0.5
+                                   animations:^{
+                                   highlightedMenuItem.transform = CGAffineTransformIdentity;
+                                   }];
+                                   }*/
                               }
                               completion:^(BOOL finished) {
                                   menuItemIsAnimating = NO;
@@ -907,7 +920,7 @@ typedef enum ZZScreenEdge : NSUInteger {
 
 - (CGPoint)calculateCenterForMenuItemAtIndex:(NSUInteger)index withCircleRadius:(CGFloat)circleRadius
 {
-    CGPoint menuItemCenter = startingLocation;
+    CGPoint menuItemCenter = CGPointZero;
     
     //Need an offset for the startingIndex for highlight logic
     CGFloat anglePercentage = (defaultStartingAngle / 360.0f);
