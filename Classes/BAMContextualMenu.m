@@ -717,7 +717,7 @@
                 }
             } else {
                 _shouldActivateMenu = NO;
-                [NSException raise:@"BAMContextualMenu's delegate MUST implement contextualMenu:viewForMenuItemAtIndex:" format:nil];
+                [NSException raise:@"BAMContextualMenu's delegate MUST implement contextualMenu:viewForMenuItemAtIndex:" format:""];
             }
             
             //Highlighted Menu Item
