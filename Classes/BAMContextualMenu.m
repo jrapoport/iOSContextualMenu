@@ -26,7 +26,7 @@
 #import "BAMContextualMenu.h"
 
 //Circle View Constants
-#define circleViewWidthHeight					50.0f
+#define circleViewWidthHeight					60.0f
 #define startCircleStrokeWidth					4.0f
 #define defaultTotalAmountOfCirclesThatCanFit	8
 #define topAndBottomTitleLabelPadding			5.0
@@ -43,7 +43,8 @@
 @interface BAMContextualMenu () <UIGestureRecognizerDelegate>
 {
     CGPoint startingLocation;
-    
+    CGPoint menuLocation;
+
     NSMutableArray *contextualMenuItems;
     NSMutableArray *highlightedMenuItems;
     NSMutableArray *defaultSelectedBackgroundViews;
@@ -97,6 +98,7 @@
 @implementation BAMContextualMenu
 
 @synthesize longPressActivationGestureRecognizer = longPressActivationGestureRecognizer;
+@synthesize defaultStartingAngle = defaultStartingAngle;
 
 #pragma mark Initialization Methods
 - (id)initWithContainingView:(UIView *)containingView activateOption:(BAMContextualMenuActivateOption)startActivateOption delegate:(id <BAMContextualMenuDelegate>)contextualDelegate andDataSource:(id <BAMContextualMenuDataSource>)contextualDataSource
@@ -226,9 +228,11 @@
     
     if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
         startingLocation = self.containerView.center;
-        
         shadowView.frame = rootView.bounds;
         startCircleView.center = startingLocation;
+
+        menuLocation = startingLocation;
+        menuLocation.x -= 30.0;
         
         [self layoutMenuItemsIfNeeded];
     }
@@ -243,9 +247,11 @@
         [rootView addSubview:shadowView];
         
         [self showMenuItems:YES completion:nil];
-    } else if (gestureRecognizer.state == UIGestureRecognizerStateChanged) {
-        CGFloat innerCircleRectX = startingLocation.x - _menuItemDistancePadding;
         
+    } else if (gestureRecognizer.state == UIGestureRecognizerStateChanged) {
+        
+        
+        CGFloat innerCircleRectX =  startingLocation.x - _menuItemDistancePadding;
         CGFloat innerCircleRadius = startingLocation.x - innerCircleRectX;
         CGFloat outerCircleRadius = innerCircleRadius + biggestMenuItemWidthHeight + circleViewWidthHeight;
         
@@ -261,10 +267,26 @@
         BOOL pointIsInsideOuterCircle = !pointIsInsideInnerCircle && (distanceFromOrigin <= outerCircleRadius);
         
         if (pointIsInsideOuterCircle) {
+
             CGFloat circleLocationAnglePercentage = (angleOfGestureLocation - angleOffset) / 360.0f;
             NSInteger locationIndex = (NSInteger)roundf(circleLocationAnglePercentage * totalAmountOfCirclesThatCanFit);
             
             locationIndex -= startingLocationIndexOffset;
+            
+            //this is a crazy hack but honestly this code is
+            //so spagetti IDGAF.
+            
+            if (contextualMenuItems.count > 3) {
+                
+                if (locationIndex == 4) {
+                    
+                    locationIndex = 3;
+                }
+                else if (locationIndex == 7) {
+                    
+                    locationIndex = 8;
+                }
+            }
             
             if (locationIndex < 0) {
                 CGFloat multiplier = ceilf((CGFloat)ABS(locationIndex) / (CGFloat)totalAmountOfCirclesThatCanFit);
@@ -312,6 +334,7 @@
         }
         
         startCircleView.center = gestureLocationInRootView;
+        
     } else if (gestureRecognizer.state == UIGestureRecognizerStateEnded) {
         BOOL activateMenuItem = (currentlyHighlightedMenuItem && currentlyHighlightedMenuItemIndex != NSNotFound);
         
@@ -320,6 +343,7 @@
             [self animateMenuItem:currentlyHighlightedMenuItem atIndex:currentlyHighlightedMenuItemIndex toPoint:originalCenter highlighted:NO];
             
             if (self.delegate && [self.delegate respondsToSelector:@selector(contextualMenu:didSelectItemAtIndex:)]) {
+                
                 [self.delegate contextualMenu:self didSelectItemAtIndex:currentlyHighlightedMenuItemIndex];
             }
             
@@ -327,7 +351,11 @@
             currentlyHighlightedMenuItemIndex = NSNotFound;
         }
         
-        [self showMenuItems:NO completion:nil];
+        dispatch_async(dispatch_get_main_queue(), ^{
+
+            [self showMenuItems:NO completion:nil];
+        });
+        
     } else {
         if (currentlyHighlightedMenuItem) {
             CGPoint originalCenter = [self calculateCenterForMenuItemAtIndex:[contextualMenuItems indexOfObject:currentlyHighlightedMenuItem] withCircleRadius:menuItemsCenterRadius];
@@ -428,8 +456,8 @@
 {
     _menuIsShowing = show;
     //totalCircle in this context means the circle from the starting location of the user's touch to the edge of the biggest menu item
-    CGFloat totalCircleRectX = startingLocation.x - (circleViewWidthHeight / 2.0) - _menuItemDistancePadding - biggestMenuItemWidthHeight;
-    CGFloat totalCircleRadius = startingLocation.x - totalCircleRectX;
+    CGFloat totalCircleRectX = menuLocation.x - (circleViewWidthHeight / 2.0) - _menuItemDistancePadding - biggestMenuItemWidthHeight;
+    CGFloat totalCircleRadius = menuLocation.x - totalCircleRectX;
     menuItemsCenterRadius = totalCircleRadius - (biggestMenuItemWidthHeight / 2.0);
     
     [menuItemRectsInRootViewArray removeAllObjects];
@@ -438,27 +466,29 @@
         if (self.delegate && [self.delegate respondsToSelector:@selector(contextualMenuActivated:)]) {
             [self.delegate contextualMenuActivated:self];
         }
+        /*
         //Calculate proper angle offset
-        ZZScreenEdge screenCorner = (startingLocation.x < rootView.frame.size.width / 2.0) ? kZZScreenEdgeLeft : kZZScreenEdgeRight;
+        ZZScreenEdge screenCorner = (menuLocation.x < rootView.frame.size.width / 2.0) ? kZZScreenEdgeLeft : kZZScreenEdgeRight;
         
-        if (startingLocation.y - totalCircleRadius - highlightRadiusOffset - titleLabelPadding - biggestTitleViewSize.height < currentStatusBarHeight) {
+        if (menuLocation.y - totalCircleRadius - highlightRadiusOffset - titleLabelPadding - biggestTitleViewSize.height < currentStatusBarHeight) {
             //The highest possible y is past the top screen edge.
             screenCorner = screenCorner | kZZScreenEdgeTop;
         }
-        [self calculateAngleOffsetForSide:screenCorner];
         
+        [self calculateAngleOffsetForSide:screenCorner];
+        */
         NSInteger loopIndex = -1;
         for (UIView *menuItem in contextualMenuItems) {
             loopIndex++;
             
-            menuItem.center = startingLocation;
+            menuItem.center = menuLocation;
             menuItem.alpha = 0.0;
             
             UIView *titleView = [contextualMenuTitleViews objectAtIndex:loopIndex];
             titleView.center = CGPointMake(menuItem.center.x, (titleView.frame.size.height / 2.0) + (menuItem.center.y - (menuItem.frame.size.height / 2.0)));
             
             UIView *highlightedMenuItem = [highlightedMenuItems objectAtIndex:loopIndex];
-            highlightedMenuItem.center = startingLocation;
+            highlightedMenuItem.center = menuLocation;
             
             highlightedMenuItem.hidden = YES;
             menuItem.hidden = NO;
@@ -468,49 +498,49 @@
                                        delay:0.0
                                      options:(UIViewKeyframeAnimationOptionBeginFromCurrentState | UIViewKeyframeAnimationOptionCalculationModeCubic)
                                   animations:^{
-                                      [UIView addKeyframeWithRelativeStartTime:0.0
-                                                              relativeDuration:1.0
-                                                                    animations:^{
-                                                                        shadowView.alpha = 1.0f;
-                                                                    }];
-                                      [UIView addKeyframeWithRelativeStartTime:0.0
-                                                              relativeDuration:0.8
-                                                                    animations:^{
-                                                                        NSInteger index = -1;
-                                                                        for (UIView *menuItem in contextualMenuItems) {
-                                                                            index++;
-                                                                            
-                                                                            CGPoint menuItemCenter = [self calculateCenterForMenuItemAtIndex:index withCircleRadius:totalCircleRadius];
-                                                                            menuItem.center = menuItemCenter;
-                                                                            menuItem.alpha = 1.0;
-                                                                            
-                                                                            UIView *titleView = [contextualMenuTitleViews objectAtIndex:index];
-                                                                            titleView.center = CGPointMake(menuItem.center.x, (titleView.frame.size.height / 2.0) + (menuItem.center.y - (menuItem.frame.size.height / 2.0)));
-                                                                            
-                                                                            UIView *highlightedMenuItem = [highlightedMenuItems objectAtIndex:index];
-                                                                            highlightedMenuItem.center = menuItem.center;
-                                                                        }
-                                                                    }];
-                                      [UIView addKeyframeWithRelativeStartTime:0.8
-                                                              relativeDuration:0.2
-                                                                    animations:^{
-                                                                        NSInteger index = -1;
-                                                                        for (UIView *menuItem in contextualMenuItems) {
-                                                                            index++;
-                                                                            
-                                                                            CGPoint menuItemCenter = [self calculateCenterForMenuItemAtIndex:index withCircleRadius:menuItemsCenterRadius];
-                                                                            menuItem.center = menuItemCenter;
-                                                                            menuItem.alpha = 1.0;
-                                                                            
-                                                                            [menuItemRectsInRootViewArray addObject:[NSValue valueWithCGRect:menuItem.frame]];
-                                                                            
-                                                                            UIView *titleView = [contextualMenuTitleViews objectAtIndex:index];
-                                                                            titleView.center = CGPointMake(menuItem.center.x, (titleView.frame.size.height / 2.0) + (menuItem.center.y - (menuItem.frame.size.height / 2.0)));
-                                                                            
-                                                                            UIView *highlightedMenuItem = [highlightedMenuItems objectAtIndex:index];
-                                                                            highlightedMenuItem.center = menuItem.center;
-                                                                        }
-                                                                    }];
+                              [UIView addKeyframeWithRelativeStartTime:0.0
+                                                      relativeDuration:1.0
+                                                            animations:^{
+                                                                shadowView.alpha = 1.0f;
+                                                            }];
+                              [UIView addKeyframeWithRelativeStartTime:0.0
+                                                      relativeDuration:0.8
+                                                            animations:^{
+                                                                NSInteger index = -1;
+                                                                for (UIView *menuItem in contextualMenuItems) {
+                                                                    index++;
+                                                                    
+                                                                    CGPoint menuItemCenter = [self calculateCenterForMenuItemAtIndex:index withCircleRadius:totalCircleRadius];
+                                                                    menuItem.center = menuItemCenter;
+                                                                    menuItem.alpha = 1.0;
+                                                                    
+                                                                    UIView *titleView = [contextualMenuTitleViews objectAtIndex:index];
+                                                                    titleView.center = CGPointMake(menuItem.center.x, (titleView.frame.size.height / 2.0) + (menuItem.center.y - (menuItem.frame.size.height / 2.0)));
+                                                                    
+                                                                    UIView *highlightedMenuItem = [highlightedMenuItems objectAtIndex:index];
+                                                                    highlightedMenuItem.center = menuItem.center;
+                                                                }
+                                                            }];
+                              [UIView addKeyframeWithRelativeStartTime:0.8
+                                                      relativeDuration:0.2
+                                                            animations:^{
+                                                                NSInteger index = -1;
+                                                                for (UIView *menuItem in contextualMenuItems) {
+                                                                    index++;
+                                                                    
+                                                                    CGPoint menuItemCenter = [self calculateCenterForMenuItemAtIndex:index withCircleRadius:menuItemsCenterRadius];
+                                                                    menuItem.center = menuItemCenter;
+                                                                    menuItem.alpha = 1.0;
+                                                                    
+                                                                    [menuItemRectsInRootViewArray addObject:[NSValue valueWithCGRect:menuItem.frame]];
+                                                                    
+                                                                    UIView *titleView = [contextualMenuTitleViews objectAtIndex:index];
+                                                                    titleView.center = CGPointMake(menuItem.center.x, (titleView.frame.size.height / 2.0) + (menuItem.center.y - (menuItem.frame.size.height / 2.0)));
+                                                                    
+                                                                    UIView *highlightedMenuItem = [highlightedMenuItems objectAtIndex:index];
+                                                                    highlightedMenuItem.center = menuItem.center;
+                                                                }
+                                                            }];
                                   }
                                   completion:^(BOOL finished) {
                                       if (completion) {
@@ -534,7 +564,7 @@
                                                                         NSInteger index = -1;
                                                                         for (UIView *menuItem in contextualMenuItems) {
                                                                             index++;
-                                                                            menuItem.center = startingLocation;
+                                                                            menuItem.center = menuLocation;
                                                                             menuItem.alpha = 0.0;
                                                                             
                                                                             UIView *titleView = [contextualMenuTitleViews objectAtIndex:index];
@@ -699,8 +729,10 @@
     } else {
         totalAmountOfCirclesThatCanFit = defaultTotalAmountOfCirclesThatCanFit;
     }
+    
     angleIncrement = (360.0f / totalAmountOfCirclesThatCanFit);
-    defaultStartingAngle = -angleIncrement;
+    
+    //defaultStartingAngle = -angleIncrement;
     
     for (NSInteger index = 0; index < numberOfMenuItems; index++) {
         if (self.delegate) {
@@ -759,7 +791,7 @@
                 if (stringIsValid(titleLabel.text)) {
                     CGFloat titleLabelHeight = titleLabel.frame.size.height + (topAndBottomTitleLabelPadding * 2.0);
                     titleLabel.frame = CGRectMake(0.0, 0.0, titleLabel.frame.size.width + (titleLabelHeight * 0.8), titleLabel.frame.size.height + (topAndBottomTitleLabelPadding * 2.0));
-                    titleLabel.center = CGPointMake(startingLocation.x + (menuItem.frame.size.width / 2.0), startingLocation.y + titleLabel.frame.size.height / 2.0);
+                    titleLabel.center = CGPointMake(menuLocation.x + (menuItem.frame.size.width / 2.0), menuLocation.y + titleLabel.frame.size.height / 2.0);
                     titleLabel.layer.cornerRadius = titleLabel.frame.size.height / 2.0;
                 } else {
                     titleLabel.frame = CGRectMake(0.0, 0.0, biggestMenuItemWidthHeight, 1.0);
@@ -785,8 +817,8 @@
             defaultSelectedBackgroundView.alpha = 0.0;
             [menuItem addSubview:defaultSelectedBackgroundView];
             
-            menuItem.center = startingLocation;
-            highlightedMenuItem.center = startingLocation;
+            menuItem.center = menuLocation;
+            highlightedMenuItem.center = menuLocation;
             menuItem.hidden = YES;
             highlightedMenuItem.hidden = YES;
             
@@ -831,6 +863,7 @@ typedef enum ZZScreenEdge : NSUInteger {
     CGFloat circleRadius = menuItemsCenterRadius + highlightRadiusOffset;
     
     //This center point is where the menu item would have started at before the angle offset is applied.
+    //BUGBUG
     CGFloat startingAngle = defaultStartingAngle - 360.0;
     if (screenEdge & kZZScreenEdgeRight) {
         startingAngle += (((CGFloat)contextualMenuItems.count - 1) * angleIncrement);
@@ -924,9 +957,11 @@ typedef enum ZZScreenEdge : NSUInteger {
     
     //Need an offset for the startingIndex for highlight logic
     CGFloat anglePercentage = (defaultStartingAngle / 360.0f);
+    
     startingLocationIndexOffset = (NSInteger)roundf(anglePercentage * totalAmountOfCirclesThatCanFit);
     
     CGFloat startingAngle = defaultStartingAngle + ((CGFloat)index * angleIncrement) + angleOffset;
+
     menuItemCenter = [self circumferentialPointForViewWithRadius:circleRadius angle:startingAngle andCenterPoint:startingLocation];
     
     return menuItemCenter;
@@ -1019,5 +1054,12 @@ typedef enum ZZScreenEdge : NSUInteger {
     shadowView = nil;
     contextualMenuItems = nil;
 }
+
+/*
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+{
+    return YES;
+}
+*/
 
 @end

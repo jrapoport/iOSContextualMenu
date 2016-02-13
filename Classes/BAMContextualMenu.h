@@ -34,6 +34,8 @@ typedef enum HMContextualMenuActivateOption : NSUInteger {
 
 @interface BAMContextualMenu : UIView
 
+@property (nonatomic) CGFloat defaultStartingAngle; 
+
 @property (nonatomic, strong) UILongPressGestureRecognizer *longPressActivationGestureRecognizer;
 
 @property (nonatomic) BOOL menuIsShowing; //Flag to turn off the ability to activate the popup menu. Defaults to YES but will be NO if menuItems array is nil or empty.
